@@ -57,6 +57,10 @@ const Creation = sequelize.define(
       ),
       defaultValue: "article",
     },
+    thread_id: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,

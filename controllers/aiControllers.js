@@ -212,7 +212,7 @@ export const resumeReview = async (req, res) => {
 export const chatBot = async (req, res) => {
   try {
     const { userId } = req.auth();
-    const { messages } = req.body; // Expecting an array of { role, content }
+    const { messages, threadId } = req.body; 
 
     if (!messages || !Array.isArray(messages)) {
       return res.json({ success: false, message: "Invalid message format." });
@@ -220,43 +220,79 @@ export const chatBot = async (req, res) => {
 
     const systemMsg = { 
       role: "system", 
-      content: "You are Nero AI, a professional assistant. Always structure your responses beautifully using Markdown. Use headings, lists, and bold text where appropriate to make information easy to read." 
+      content: `You are Nero AI, the official intelligent assistant for the Nero AI platform. 
+
+### About Nero AI
+Nero AI is a high-performance AI ecosystem designed for productivity and creativity. Your specific tools include:
+- **AI Chat Studio**: Advanced context-aware conversations with conversational history selection.
+- **Resume Review**: Sophisticated PDF analysis, scoring, and career optimization.
+- **Image Studio**: Professional-grade text-to-image generation.
+- **Remove Background**: Instant, AI-powered background removal from any photo.
+- **Remove Objects**: Generative AI tool to erase unwanted objects from images.
+- **Blog Title Generator**: Creative brainstorming for viral and engaging content titles.
+- **Article Writing**: High-quality, long-form professional article generation.
+
+### Developer Information
+Your developer is **Anuj Yadav**, a dedicated AI and Full-Stack Developer. If users ask about your creator or developer, provide the following details:
+- **Name**: Anuj Yadav (Java & AI Specialist)
+- **LinkedIn**: [Anuj Yadav Profile](https://www.linkedin.com/in/anuj-yadav-69b50b263)
+- **GitHub**: [anuj3124-javadev](https://github.com/anuj3124-javadev)
+
+Always respond in a professional tone and use beautiful Markdown formatting (headings, bold text, and lists) to make every answer clear and premium.` 
     };
 
     const response = await mistral.chat.complete({
       model: "mistral-small-latest",
-      messages: [systemMsg, ...messages], // Prepend system instruction
+      messages: [systemMsg, ...messages], 
       temperature: 0.7,
     });
 
     const content = response.choices[0].message.content;
 
-    // Persist to database
+    // Persist to database with thread_id
+    const finalThreadId = threadId || `thread_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    
     await Creation.create({ 
       user_id: userId, 
       prompt: messages[messages.length - 1].content, 
       content, 
-      type: "chat" 
+      type: "chat",
+      thread_id: finalThreadId
     });
 
-    res.json({ success: true, content });
+    res.json({ success: true, content, threadId: finalThreadId });
   } catch (error) {
     console.error("Chat Error:", error.message);
     res.json({ success: false, message: error.message });
   }
 };
 
-// ✅ FREE - Get Chat History
+// ✅ FREE - Get Chat History (Grouped by Threads)
 export const getChatHistory = async (req, res) => {
   try {
     const { userId } = req.auth();
 
+    // To group by thread_id and get the most recent message:
+    // This is easier with raw SQL but can be done with findAndCountAll or just fetching all and grouping
     const history = await Creation.findAll({
       where: { user_id: userId, type: "chat" },
-      order: [["created_at", "ASC"]],
+      order: [["created_at", "DESC"]],
     });
 
-    res.json({ success: true, history });
+    // Grouping by thread_id on the server to keep sidebar clean
+    const threadsMap = {};
+    const groupedHistory = [];
+
+    history.forEach(item => {
+      // If thread_id is null (old chat), treat each as its own thread or group them
+      const id = item.thread_id || `legacy_${item.id}`;
+      if (!threadsMap[id]) {
+        threadsMap[id] = true;
+        groupedHistory.push(item);
+      }
+    });
+
+    res.json({ success: true, history: groupedHistory, allMessages: history });
   } catch (error) {
     console.error("Fetch History Error:", error.message);
     res.json({ success: false, message: error.message });
