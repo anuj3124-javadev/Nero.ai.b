@@ -11,10 +11,14 @@ import aiRouter from "./routes/aiRoutes.js";
 import connectCloudinary from "./config/cloudinary.js";
 import userRouter from "./routes/userRoutes.js";
 import imageRouter from "./routes/imageRoutes.js";
+import checkEnv from "./services/checkEnv.js";
 
 
 
 const app = express();
+
+// Validate Environment Variables
+checkEnv();
 
 // Connect MySQL Database and sync tables
 await connectDB();

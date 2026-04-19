@@ -9,7 +9,12 @@ const connectDB = async () => {
     await sequelize.sync({ alter: true });
     console.log("✅ Database tables synced.");
   } catch (error) {
-    console.error("❌ MySQL connection failed:", error.message);
+    console.error("\n❌ DATABASE CONNECTION FAILED");
+    console.error("------------------------------");
+    console.error(`Host: ${process.env.DB_HOST}`);
+    console.error(`Database: ${process.env.DB_NAME}`);
+    console.error(`Error: ${error.message}`);
+    console.error("------------------------------\n");
     process.exit(1);
   }
 };

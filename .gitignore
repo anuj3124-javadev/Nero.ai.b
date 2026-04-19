@@ -1,5 +1,6 @@
 # Environment variables file
 .env
+.env.example
 
 # Files with credentials
 secrets.json
