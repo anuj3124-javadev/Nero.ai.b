@@ -1,0 +1,5 @@
+1) npm init -y
+2) npm install express dotenv co
+rs axios cloudinary multer
+3)npm install --save-dev nodemo
+n

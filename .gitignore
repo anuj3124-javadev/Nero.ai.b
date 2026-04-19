@@ -1,0 +1,12 @@
+# Environment variables file
+.env
+
+# Files with credentials
+secrets.json
+
+# Log files
+*.log
+
+# Temporary build folder
+/build/
+node_modules
