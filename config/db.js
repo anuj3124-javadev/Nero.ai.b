@@ -1,4 +1,10 @@
 import sequelize from "./sequelize.js";
+import User from "../models/User.js";
+import Creation from "../models/Creation.js";
+
+// Set up associations
+User.hasMany(Creation, { foreignKey: "user_id", sourceKey: "clerkId", constraints: false });
+Creation.belongsTo(User, { foreignKey: "user_id", targetKey: "clerkId", constraints: false });
 
 const connectDB = async () => {
   try {
