@@ -52,7 +52,8 @@ const Creation = sequelize.define(
         "image",
         "remove-background",
         "remove-object",
-        "resume-review"
+        "resume-review",
+        "chat"
       ),
       defaultValue: "article",
     },

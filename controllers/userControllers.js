@@ -6,7 +6,10 @@ export const getUserCreations = async (req, res) => {
   try {
     const { userId } = req.auth();
     const creations = await Creation.findAll({
-      where: { user_id: userId },
+      where: { 
+        user_id: userId,
+        type: { [Op.ne]: "chat" } // Exclude chat history from dashboard
+      },
       order: [["created_at", "DESC"]],
     });
     res.json({ success: true, creations });

@@ -174,7 +174,17 @@ export const resumeReview = async (req, res) => {
     const dataBuffer = fs.readFileSync(resume.path);
     const pdfData = await Pdf(dataBuffer);
 
-    const prompt = `Review my resume and suggest improvements. Here is the content: ${pdfData.text}`;
+    const prompt = `You are an expert career coach and resume reviewer. 
+    Review the following resume content and provide a detailed, highly structured report in Markdown.
+    
+    Use the following sections:
+    # 📊 Overall Score (0-100)
+    ## 🚀 Key Strengths
+    ## 💡 Areas for Improvement
+    ## 🛠️ Actionable Tips
+    ## 🎯 Keywords to Add
+    
+    Resume Content: ${pdfData.text}`;
 
     const response = await mistral.chat.complete({
       model: "mistral-small-latest",
@@ -195,6 +205,97 @@ export const resumeReview = async (req, res) => {
     res.json({ success: true, content });
   } catch (error) {
     console.error(error.message);
+    res.json({ success: false, message: error.message });
+  }
+};
+// ✅ FREE - AI Chatbot
+export const chatBot = async (req, res) => {
+  try {
+    const { userId } = req.auth();
+    const { messages } = req.body; // Expecting an array of { role, content }
+
+    if (!messages || !Array.isArray(messages)) {
+      return res.json({ success: false, message: "Invalid message format." });
+    }
+
+    const systemMsg = { 
+      role: "system", 
+      content: "You are Nero AI, a professional assistant. Always structure your responses beautifully using Markdown. Use headings, lists, and bold text where appropriate to make information easy to read." 
+    };
+
+    const response = await mistral.chat.complete({
+      model: "mistral-small-latest",
+      messages: [systemMsg, ...messages], // Prepend system instruction
+      temperature: 0.7,
+    });
+
+    const content = response.choices[0].message.content;
+
+    // Persist to database
+    await Creation.create({ 
+      user_id: userId, 
+      prompt: messages[messages.length - 1].content, 
+      content, 
+      type: "chat" 
+    });
+
+    res.json({ success: true, content });
+  } catch (error) {
+    console.error("Chat Error:", error.message);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// ✅ FREE - Get Chat History
+export const getChatHistory = async (req, res) => {
+  try {
+    const { userId } = req.auth();
+
+    const history = await Creation.findAll({
+      where: { user_id: userId, type: "chat" },
+      order: [["created_at", "ASC"]],
+    });
+
+    res.json({ success: true, history });
+  } catch (error) {
+    console.error("Fetch History Error:", error.message);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// ✅ FREE - Delete ALL Chat History
+export const deleteChatHistory = async (req, res) => {
+  try {
+    const { userId } = req.auth();
+
+    await Creation.destroy({
+      where: { user_id: userId, type: "chat" }
+    });
+
+    res.json({ success: true, message: "Chat history cleared." });
+  } catch (error) {
+    console.error("Delete History Error:", error.message);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// ✅ FREE - Delete Single Chat Item
+export const deleteChatItem = async (req, res) => {
+  try {
+    const { userId } = req.auth();
+    const { id } = req.params;
+
+    const result = await Creation.destroy({
+      where: { id, user_id: userId, type: "chat" }
+    });
+
+    if (result) {
+      res.json({ success: true, message: "Message deleted." });
+    } else {
+      res.json({ success: false, message: "Item not found or unauthorized." });
+    }
+  } catch (error) {
+    console.error("Delete Item Error:", error.message);
     res.json({ success: false, message: error.message });
   }
 };
