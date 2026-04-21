@@ -4,7 +4,7 @@ import { Op } from "sequelize";
 // Get all creations of the logged-in user
 export const getUserCreations = async (req, res) => {
   try {
-    const { userId } = req.auth();
+    const { userId } = req.auth;
     const creations = await Creation.findAll({
       where: { 
         user_id: userId,
@@ -34,7 +34,7 @@ export const getPublishedCreations = async (req, res) => {
 // Toggle like for a creation
 export const toggleLikeCreation = async (req, res) => {
   try {
-    const { userId } = req.auth();
+    const { userId } = req.auth;
     const { id } = req.body;
 
     const creation = await Creation.findByPk(id);

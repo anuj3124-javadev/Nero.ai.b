@@ -5,6 +5,7 @@ import { v2 as cloudinary } from "cloudinary";
 import axios from "axios";
 import fs from "fs";
 import Pdf from "pdf-parse/lib/pdf-parse.js";
+import { generateImageService } from "../services/imageService.js";
 
 const mistral = new Mistral({
   apiKey: process.env.MISTRAL_API_KEY,
@@ -13,7 +14,7 @@ const mistral = new Mistral({
 // ✅ FREE - Generate Article (no plan check)
 export const generateArticle = async (req, res) => {
   try {
-    const { userId } = req.auth();
+    const { userId } = req.auth;
     const { prompt, length } = req.body;
 
     const response = await mistral.chat.complete({
@@ -37,7 +38,7 @@ export const generateArticle = async (req, res) => {
 // ✅ FREE - Generate Blog Titles (no plan check)
 export const generateBlogTitle = async (req, res) => {
   try {
-    const { userId } = req.auth();
+    const { userId } = req.auth;
     const { prompt } = req.body;
 
     const response = await mistral.chat.complete({
@@ -58,42 +59,76 @@ export const generateBlogTitle = async (req, res) => {
   }
 };
 
-// ✅ FREE - Generate Image
+// ✅ FREE - Generate Image (ClipDrop with HF Fallback)
 export const generateImage = async (req, res) => {
   try {
-    const { userId } = req.auth();
+    const { userId } = req.auth;
     const { prompt, publish } = req.body;
 
-    const formData = new FormData();
-    formData.append("prompt", prompt);
+    if (!prompt) {
+      return res.json({ success: false, message: "Prompt is required." });
+    }
 
-    const { data } = await axios.post(
-      "https://clipdrop-api.co/text-to-image/v1",
-      formData,
-      {
-        headers: { "x-api-key": process.env.CLIPDROP_API_KEY },
-        responseType: "arraybuffer",
+    let imageUrl = "";
+
+    try {
+      // Try ClipDrop first
+      const formData = new FormData();
+      formData.append("prompt", prompt);
+
+      const { data } = await axios.post(
+        "https://clipdrop-api.co/text-to-image/v1",
+        formData,
+        {
+          headers: {
+            "x-api-key": process.env.CLIPDROP_API_KEY,
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+            ...formData.getHeaders(),
+          },
+          responseType: "arraybuffer",
+          timeout: 15000, // 15s timeout
+        }
+      );
+
+      const base64Image = `data:image/png;base64,${Buffer.from(
+        data,
+        "binary"
+      ).toString("base64")}`;
+
+      const upload = await cloudinary.uploader.upload(base64Image, {
+        folder: "nero-ai/generated-images",
+      });
+      imageUrl = upload.secure_url;
+      console.log("Image generated via ClipDrop");
+
+    } catch (clipDropError) {
+      console.error("ClipDrop Error (Falling back to HF):", clipDropError.message);
+      
+      // Fallback to Hugging Face FLUX Service
+      try {
+        const hfBase64 = await generateImageService(prompt);
+        const upload = await cloudinary.uploader.upload(hfBase64, {
+          folder: "nero-ai/generated-images",
+        });
+        imageUrl = upload.secure_url;
+        console.log("Image generated via Hugging Face Fallback");
+      } catch (hfError) {
+        console.error("Hugging Face Fallback Error:", hfError.message);
+        throw new Error("Both ClipDrop and Hugging Face failed to generate image.");
       }
-    );
-
-    const base64Image = `data:image/png;base64,${Buffer.from(
-      data,
-      "binary"
-    ).toString("base64")}`;
-
-    const { secure_url } = await cloudinary.uploader.upload(base64Image);
+    }
 
     await Creation.create({
       user_id: userId,
       prompt,
-      secure_url,
+      secure_url: imageUrl,
       publish: publish || false,
       type: "image",
     });
 
-    res.json({ success: true, imageUrl: secure_url });
+    res.json({ success: true, imageUrl });
   } catch (error) {
-    console.error(error.message);
+    console.error("Generate Image Controller Error:", error.message);
     res.json({ success: false, message: error.message });
   }
 };
@@ -101,7 +136,7 @@ export const generateImage = async (req, res) => {
 // ✅ FREE - Remove Image Background
 export const removeImageBackground = async (req, res) => {
   try {
-    const { userId } = req.auth();
+    const { userId } = req.auth;
     const image = req.file;
 
     const { secure_url } = await cloudinary.uploader.upload(image.path, {
@@ -130,7 +165,7 @@ export const removeImageBackground = async (req, res) => {
 // ✅ FREE - Remove Object from Image
 export const removeImageObject = async (req, res) => {
   try {
-    const { userId } = req.auth();
+    const { userId } = req.auth;
     const { object } = req.body;
     const image = req.file;
 
@@ -161,7 +196,7 @@ export const removeImageObject = async (req, res) => {
 // ✅ FREE - Review Resume
 export const resumeReview = async (req, res) => {
   try {
-    const { userId } = req.auth();
+    const { userId } = req.auth;
     const resume = req.file;
 
     if (resume.size > 5 * 1024 * 1024) {
@@ -211,15 +246,15 @@ export const resumeReview = async (req, res) => {
 // ✅ FREE - AI Chatbot
 export const chatBot = async (req, res) => {
   try {
-    const { userId } = req.auth();
-    const { messages, threadId } = req.body; 
+    const { userId } = req.auth;
+    const { messages, threadId } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.json({ success: false, message: "Invalid message format." });
     }
 
-    const systemMsg = { 
-      role: "system", 
+    const systemMsg = {
+      role: "system",
       content: `You are Nero AI, the official intelligent assistant for the Nero AI platform. 
 
 ### About Nero AI
@@ -238,12 +273,12 @@ Your developer is **Anuj Yadav**, a dedicated AI and Full-Stack Developer. If us
 - **LinkedIn**: [Anuj Yadav Profile](https://www.linkedin.com/in/anuj-yadav-69b50b263)
 - **GitHub**: [anuj3124-javadev](https://github.com/anuj3124-javadev)
 
-Always respond in a professional tone and use beautiful Markdown formatting (headings, bold text, and lists) to make every answer clear and premium.` 
+Always respond in a professional tone and use beautiful Markdown formatting (headings, bold text, and lists) to make every answer clear and premium.`
     };
 
     const response = await mistral.chat.complete({
       model: "mistral-small-latest",
-      messages: [systemMsg, ...messages], 
+      messages: [systemMsg, ...messages],
       temperature: 0.7,
     });
 
@@ -251,11 +286,11 @@ Always respond in a professional tone and use beautiful Markdown formatting (hea
 
     // Persist to database with thread_id
     const finalThreadId = threadId || `thread_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    
-    await Creation.create({ 
-      user_id: userId, 
-      prompt: messages[messages.length - 1].content, 
-      content, 
+
+    await Creation.create({
+      user_id: userId,
+      prompt: messages[messages.length - 1].content,
+      content,
       type: "chat",
       thread_id: finalThreadId
     });
@@ -270,7 +305,7 @@ Always respond in a professional tone and use beautiful Markdown formatting (hea
 // ✅ FREE - Get Chat History (Grouped by Threads)
 export const getChatHistory = async (req, res) => {
   try {
-    const { userId } = req.auth();
+    const { userId } = req.auth;
 
     // To group by thread_id and get the most recent message:
     // This is easier with raw SQL but can be done with findAndCountAll or just fetching all and grouping
@@ -302,7 +337,7 @@ export const getChatHistory = async (req, res) => {
 // ✅ FREE - Delete ALL Chat History
 export const deleteChatHistory = async (req, res) => {
   try {
-    const { userId } = req.auth();
+    const { userId } = req.auth;
 
     await Creation.destroy({
       where: { user_id: userId, type: "chat" }
@@ -318,7 +353,7 @@ export const deleteChatHistory = async (req, res) => {
 // ✅ FREE - Delete Single Chat Item
 export const deleteChatItem = async (req, res) => {
   try {
-    const { userId } = req.auth();
+    const { userId } = req.auth;
     const { id } = req.params;
 
     const result = await Creation.destroy({

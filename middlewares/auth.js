@@ -3,7 +3,7 @@ import User from "../models/User.js";
 
 export const auth = async (req, res, next) => {
   try {
-    const { userId } = await req.auth();
+    const { userId } = req.auth;
 
     if (!userId) {
       return res.json({ success: false, message: "Unauthorized. Please sign in." });
