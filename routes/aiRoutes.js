@@ -1,6 +1,6 @@
 import express from "express";
 import { auth } from "../middlewares/auth.js";
-import { generateArticle, generateBlogTitle, generateImage, removeImageBackground, removeImageObject, resumeReview, chatBot, getChatHistory, deleteChatHistory, deleteChatItem } from "../controllers/aiControllers.js";
+import { generateArticle, generateBlogTitle, generateImage, removeImageBackground, removeImageObject, resumeReview, chatBot, getChatHistory, deleteChatHistory, deleteChatItem, deleteChatThread } from "../controllers/aiControllers.js";
 import { upload } from "../config/multer.js";
 
 const aiRouter = express.Router();
@@ -15,5 +15,6 @@ aiRouter.post("/chat", auth, chatBot );
 aiRouter.get("/chat-history", auth, getChatHistory );
 aiRouter.delete("/chat-history", auth, deleteChatHistory );
 aiRouter.delete("/chat-item/:id", auth, deleteChatItem );
+aiRouter.delete("/chat-thread/:threadId", auth, deleteChatThread );
 
 export default aiRouter;

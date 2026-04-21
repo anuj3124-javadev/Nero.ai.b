@@ -370,3 +370,24 @@ export const deleteChatItem = async (req, res) => {
     res.json({ success: false, message: error.message });
   }
 };
+
+// ✅ FREE - Delete Entire Chat Thread
+export const deleteChatThread = async (req, res) => {
+  try {
+    const { userId } = req.auth;
+    const { threadId } = req.params;
+
+    const result = await Creation.destroy({
+      where: { thread_id: threadId, user_id: userId, type: "chat" }
+    });
+
+    if (result) {
+      res.json({ success: true, message: "Thread deleted." });
+    } else {
+      res.json({ success: false, message: "Thread not found or unauthorized." });
+    }
+  } catch (error) {
+    console.error("Delete Thread Error:", error.message);
+    res.json({ success: false, message: error.message });
+  }
+};
